@@ -774,6 +774,10 @@ func (r *KustomizationReconciler) apply(ctx context.Context, manager *ssa.Resour
 		}
 
 		if ssa.IsClusterDefinition(u) {
+			// remove namespaces from CRDs so health check passes
+			if u.GetNamespace() != "" {
+				u.SetNamespace("")
+			}
 			stageOne = append(stageOne, u)
 		} else {
 			stageTwo = append(stageTwo, u)
