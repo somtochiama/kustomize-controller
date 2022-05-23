@@ -39,6 +39,7 @@ var (
 // make use of the various `test*` variables.
 func TestMain(m *testing.M) {
 	// this is set to prevent "certificate signed by unknown authority" errors
+	os.Setenv("VAULT_SKIP_VERIFY", "true")
 	os.Setenv("VAULT_INSECURE", "true")
 	t := &testing.T{}
 	coreConfig := &vault.CoreConfig{
@@ -56,31 +57,18 @@ func TestMain(m *testing.M) {
 		logger.Fatalf("test core not active: %s", err)
 	}
 
-	api.DefaultConfig()
 	testClient := cluster.Cores[0].Client
+
+	status, err := testClient.Sys().InitStatus()
+	if err != nil {
+		logger.Fatalf("cannot checking Vault client status: %s", err)
+	}
+	if status != true {
+		logger.Fatal("waiting on Vault server to become ready")
+	}
+
 	testVaultToken = testClient.Token()
 	testVaultAddress = testClient.Address()
-
-	// Wait until Vault is ready to serve requests
-	if err := func() error {
-		cfg := api.DefaultConfig()
-		cfg.Address = testVaultAddress
-		cli, err := api.NewClient(cfg)
-		cli.SetToken(testClient.Token())
-		if err != nil {
-			return fmt.Errorf("cannot create Vault client: %w", err)
-		}
-		status, err := cli.Sys().InitStatus()
-		if err != nil {
-			return err
-		}
-		if status != true {
-			return fmt.Errorf("waiting on Vault server to become ready")
-		}
-		return nil
-	}(); err != nil {
-		logger.Fatalf("could not connect to local vault server: %s", err)
-	}
 
 	if err := enableVaultTransit(testVaultAddress, testVaultToken, testEnginePath); err != nil {
 		logger.Fatalf("could not enable Vault transit: %s", err)
